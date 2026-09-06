@@ -6,10 +6,12 @@ import {
   Code2,
   ChevronDown,
   ChevronUp,
+  Paperclip,
 } from 'lucide-react';
 import { ProjectService } from '../../services/project.service';
 import { useAuth } from '../../context/AuthContext';
 import { Project, STAGE_DISPLAY_NAMES } from '@antigravity/shared';
+import { AttachmentList } from '../../components/attachments/AttachmentList';
 
 export const EmployeeProjectsPage: React.FC = () => {
   const { user } = useAuth();
@@ -133,34 +135,50 @@ export const EmployeeProjectsPage: React.FC = () => {
                     onClick={() => toggleExpand(project.id)}
                     className="flex items-center gap-1.5 font-bold text-indigo-600 hover:text-indigo-700"
                   >
-                    <span>{isExpanded ? 'Hide Technical Context' : 'View Requirements & Architecture'}</span>
+                    <span>{isExpanded ? 'Hide Specifications & Documents' : 'View Specifications & Documents'}</span>
                     {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </button>
                 </div>
 
                 {/* Expandable Technical Context Drawer */}
                 {isExpanded && (
-                  <div className="pt-4 border-t border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl">
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-2">
-                        <FileText className="w-3.5 h-3.5 text-indigo-600" />
-                        Requirements & Acceptance Criteria
-                      </h4>
-                      <p className="text-xs text-slate-700 whitespace-pre-line bg-white p-3 rounded-lg border border-slate-200">
-                        {project.client_requirements || project.functional_requirements || project.acceptance_criteria || 'No technical specifications documented yet.'}
-                      </p>
+                  <div className="pt-4 border-t border-slate-200 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-2">
+                          <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                          Requirements & Acceptance Criteria
+                        </h4>
+                        <p className="text-xs text-slate-700 whitespace-pre-line bg-white p-3 rounded-lg border border-slate-200">
+                          {project.client_requirements || project.functional_requirements || project.acceptance_criteria || 'No technical specifications documented yet.'}
+                        </p>
+                      </div>
+
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-2">
+                          <Code2 className="w-3.5 h-3.5 text-indigo-600" />
+                          System Architecture & Stack
+                        </h4>
+                        <div className="bg-white p-3 rounded-lg border border-slate-200 text-xs text-slate-700 space-y-1">
+                          <p><strong>Tech Stack:</strong> {project.technology_stack || 'Not specified'}</p>
+                          <p><strong>Architecture:</strong> {project.system_architecture || 'Pending design'}</p>
+                          <p><strong>Database:</strong> {project.database_info || 'PostgreSQL'}</p>
+                        </div>
+                      </div>
                     </div>
 
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-2">
-                        <Code2 className="w-3.5 h-3.5 text-indigo-600" />
-                        System Architecture & Stack
-                      </h4>
-                      <div className="bg-white p-3 rounded-lg border border-slate-200 text-xs text-slate-700 space-y-1">
-                        <p><strong>Tech Stack:</strong> {project.technology_stack || 'Not specified'}</p>
-                        <p><strong>Architecture:</strong> {project.system_architecture || 'Pending design'}</p>
-                        <p><strong>Database:</strong> {project.database_info || 'PostgreSQL'}</p>
+                    {/* Attached Project Documents & Deliverables */}
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <Paperclip className="w-4 h-4 text-indigo-600" />
+                          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                            Project Documents & Specifications
+                          </h4>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-semibold">Shared Project Deliverables</span>
                       </div>
+                      <AttachmentList projectId={project.id} />
                     </div>
                   </div>
                 )}
