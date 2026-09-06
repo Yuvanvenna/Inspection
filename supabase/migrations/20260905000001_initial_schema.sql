@@ -231,6 +231,15 @@ CREATE POLICY "Employees can view assigned projects"
     )
   );
 
+-- Helper function: Check if current user is a project member (SECURITY DEFINER avoids RLS recursion)
+CREATE OR REPLACE FUNCTION public.is_project_member(p_project_id UUID)
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.project_members
+    WHERE project_id = p_project_id AND user_id = auth.uid()
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+
 -- PROJECT MEMBERS POLICIES
 CREATE POLICY "Managers can manage project members"
   ON public.project_members FOR ALL
@@ -241,11 +250,7 @@ CREATE POLICY "Users can view members of their projects"
   ON public.project_members FOR SELECT
   TO authenticated
   USING (
-    public.is_manager() OR
-    EXISTS (
-      SELECT 1 FROM public.project_members pm
-      WHERE pm.project_id = public.project_members.project_id AND pm.user_id = auth.uid()
-    )
+    public.is_manager() OR user_id = auth.uid() OR public.is_project_member(project_id)
   );
 
 -- WORKFLOW STAGES POLICIES

@@ -52,8 +52,7 @@ export const ProjectService = {
       .select(`
         *,
         client:clients(id, name, company),
-        stages:workflow_stages(id, name, stage_order, calculated_progress, manager_override, effective_progress, status),
-        members:project_members(id, user:profiles(id, name, email, role))
+        stages:workflow_stages(id, name, stage_order, calculated_progress, manager_override, effective_progress, status)
       `)
       .order('created_at', { ascending: false });
 
@@ -123,14 +122,24 @@ export const ProjectService = {
         stages:workflow_stages(
           id, name, stage_order, calculated_progress, manager_override, effective_progress, status,
           tasks:tasks(id, title, status, progress, priority, deadline, assigned_to_profile:profiles(id, name))
-        ),
-        members:project_members(id, user_id, user:profiles(id, name, email, role, department))
+        )
       `)
       .eq('id', id)
       .single();
 
     if (error) {
       throw new Error(`Failed to fetch project: ${error.message}`);
+    }
+
+    // Safely attach members
+    try {
+      const { data: membersData } = await supabase
+        .from('project_members')
+        .select('id, user_id, user:profiles(id, name, email, role, department)')
+        .eq('project_id', id);
+      data.members = membersData || [];
+    } catch {
+      data.members = [];
     }
 
     if (data.stages) {
