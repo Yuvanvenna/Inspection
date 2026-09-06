@@ -16,7 +16,6 @@ import {
 import { supabase } from '../../lib/supabase';
 import { STAGE_DISPLAY_NAMES, StageName } from '@antigravity/shared';
 import { KPISkeleton, StageTrackerSkeleton, TaskCardSkeleton, TimelineSkeleton } from '../../components/common/Skeletons';
-import { ProjectService } from '../../services/project.service';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -416,12 +415,13 @@ export const ManagerDashboard: React.FC = () => {
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
             Create your first client project to initialize the automatic six workflow stages.
           </p>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg shadow-sm hover:bg-indigo-700"
+          <Link
+            to="/manager/projects"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg shadow-sm hover:bg-indigo-700 transition-colors"
           >
-            <Plus className="w-4 h-4" /> Create Project
-          </button>
+            <span>Go to Projects Directory</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
       )}
 
