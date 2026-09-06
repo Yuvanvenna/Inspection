@@ -43,6 +43,8 @@ const DEFAULT_CONFIG: SystemConfig = {
   sessionTimeoutHours: 8,
 };
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
 export const SettingsPage: React.FC = () => {
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -61,7 +63,7 @@ export const SettingsPage: React.FC = () => {
     setTestingApi(true);
     const start = performance.now();
     try {
-      const res = await fetch('http://localhost:5000/api/health');
+      const res = await fetch(`${API_URL}/health`);
       const end = performance.now();
       if (res.ok) {
         setApiLatency(Math.round(end - start));
@@ -508,8 +510,8 @@ export const SettingsPage: React.FC = () => {
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-500 space-y-1">
-                  <p>Endpoint: <span className="font-mono text-slate-700">http://localhost:5000/api</span></p>
-                  <p>Health Route: <span className="font-mono text-slate-700">/api/health</span></p>
+                  <p>Endpoint: <span className="font-mono text-slate-700">{API_URL}</span></p>
+                  <p>Health Route: <span className="font-mono text-slate-700">{API_URL}/health</span></p>
                   <p>Latency: <span className="font-bold text-slate-800">{apiLatency !== null ? `${apiLatency} ms` : 'Measuring...'}</span></p>
                 </div>
               </div>
