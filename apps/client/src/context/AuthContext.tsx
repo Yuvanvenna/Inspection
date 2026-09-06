@@ -16,34 +16,9 @@ interface AuthContextType {
     department?: string;
   }) => Promise<{ error?: string; role?: Role }>;
   logout: () => Promise<void>;
-  loginAsDemo?: (role: Role) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Demo Seed Users for immediate inspection/testing
-const DEMO_USERS: Record<Role, UserProfile> = {
-  MANAGER: {
-    id: '00000000-0000-0000-0000-000000000001',
-    name: 'Alex Morgan',
-    email: 'manager@antigravity.io',
-    role: 'MANAGER',
-    status: 'ACTIVE',
-    department: 'Product & Engineering',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  EMPLOYEE: {
-    id: '00000000-0000-0000-0000-000000000002',
-    name: 'Rahul Sharma',
-    email: 'rahul@antigravity.io',
-    role: 'EMPLOYEE',
-    status: 'ACTIVE',
-    department: 'Backend Engineering',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(() => {
@@ -111,6 +86,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     const cleanEmail = email.trim();
 
+    if (!password) {
+      setLoading(false);
+      return { error: 'Password is required' };
+    }
+
     try {
       // 1. Authenticate via Express API against database
       const res = await fetch(`${API_URL}/auth/login`, {
@@ -118,7 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: cleanEmail,
-          password: password || 'Password123!',
+          password,
         }),
       });
 
@@ -139,7 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else {
             await supabase.auth.signInWithPassword({
               email: cleanEmail,
-              password: password || 'Password123!',
+              password,
             });
           }
         } catch (authSyncErr) {
@@ -161,7 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // First sign in with Supabase auth so auth.uid() is defined for RLS
       const { data: authData } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
-        password: password || 'Password123!',
+        password,
       });
 
       const profileId = authData?.user?.id;
@@ -185,7 +165,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     setLoading(false);
-    return { error: 'Invalid email or password. Please check your credentials or register a new account.' };
+    return { error: 'Invalid email or password. Please contact your manager if you need an account.' };
   };
 
   const signUp = async (data: {
@@ -196,6 +176,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     department?: string;
   }): Promise<{ error?: string; role?: Role }> => {
     setLoading(true);
+    if (!data.password) {
+      setLoading(false);
+      return { error: 'Password is required (minimum 6 characters)' };
+    }
+
     try {
       // 1. Call server API to register user in Supabase Auth & public.profiles
       const response = await fetch(`${API_URL}/employees`, {
@@ -204,7 +189,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         body: JSON.stringify({
           name: data.name,
           email: data.email.trim(),
-          password: data.password || 'Password123!',
+          password: data.password,
           role: data.role || 'EMPLOYEE',
           department: data.department || 'Engineering',
         }),
@@ -269,15 +254,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('ag_active_user');
   };
 
-  const loginAsDemo = (role: Role) => {
-    const demoUser = DEMO_USERS[role];
-    setUser(demoUser);
-    localStorage.setItem('ag_active_user', JSON.stringify(demoUser));
-    setLoading(false);
-  };
-
   return (
-    <AuthContext.Provider value={{ user, loading, login, signUp, logout, loginAsDemo }}>
+    <AuthContext.Provider value={{ user, loading, login, signUp, logout }}>
       {children}
     </AuthContext.Provider>
   );

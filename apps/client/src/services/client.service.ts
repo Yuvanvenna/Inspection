@@ -29,31 +29,8 @@ export const ClientService = {
       .order('created_at', { ascending: false });
 
     if (error) {
-      // Return hardcoded seed fallback if both fail so UI never breaks
-      return [
-        {
-          id: '10000000-0000-0000-0000-000000000001',
-          name: 'Apex Aerospace',
-          company: 'Apex Dynamics Inc.',
-          contact_person: 'David Vance',
-          contact_email: 'd.vance@apexaero.com',
-          phone: '+1-555-0199',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          project_count: 1,
-        },
-        {
-          id: '10000000-0000-0000-0000-000000000002',
-          name: 'Vertex BioTech',
-          company: 'Vertex Laboratories',
-          contact_person: 'Sarah Lin',
-          contact_email: 'slin@vertexbio.org',
-          phone: '+1-555-0245',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          project_count: 1,
-        },
-      ];
+      console.error('Failed to fetch clients from Supabase:', error.message);
+      return [];
     }
 
     return (clients || []).map((c: any) => ({

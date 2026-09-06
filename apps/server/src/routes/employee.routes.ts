@@ -31,7 +31,7 @@ const createEmployeeSchema = z.object({
   email: z.string().email(),
   role: z.enum(['MANAGER', 'EMPLOYEE']),
   department: z.string().optional(),
-  password: z.string().min(6).optional(),
+  password: z.string().min(6),
 });
 
 employeeRouter.post('/employees', async (req: Request, res: Response) => {
@@ -40,7 +40,7 @@ employeeRouter.post('/employees', async (req: Request, res: Response) => {
     if (!parsed.success) {
       return res.status(400).json({
         success: false,
-        error: { message: 'Invalid employee data', details: parsed.error.format() },
+        error: { message: 'Invalid employee data. Password must be at least 6 characters.', details: parsed.error.format() },
       });
     }
 
@@ -49,7 +49,7 @@ employeeRouter.post('/employees', async (req: Request, res: Response) => {
     // 1. Create Supabase Auth User with admin API
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password: password || 'Password123!',
+      password,
       email_confirm: true,
       user_metadata: { name },
     });
@@ -100,8 +100,8 @@ employeeRouter.post('/employees', async (req: Request, res: Response) => {
 employeeRouter.post('/auth/login', async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
-    if (!email) {
-      return res.status(400).json({ success: false, error: 'Email is required' });
+    if (!email || !password) {
+      return res.status(400).json({ success: false, error: 'Email and password are required' });
     }
 
     const cleanEmail = email.toLowerCase().trim();
@@ -131,47 +131,24 @@ employeeRouter.post('/auth/login', async (req: Request, res: Response) => {
       });
     }
 
-    // 2. Ensure user exists in Supabase GoTrue Auth
-    let sessionToken: string | null = null;
+    // 2. Authenticate against Supabase Auth with provided password
     const { data: authData, error: authError } = await supabaseAdmin.auth.signInWithPassword({
       email: profile.email,
-      password: password || 'Password123!',
+      password,
     });
 
-    if (!authError && authData?.session?.access_token) {
-      sessionToken = authData.session.access_token;
-    } else {
-      // Seed user or uninitialized GoTrue user: register/update password in auth
-      try {
-        await supabaseAdmin.auth.admin.createUser({
-          id: profile.id,
-          email: profile.email,
-          password: password || 'Password123!',
-          email_confirm: true,
-          user_metadata: { name: profile.name },
-        });
-      } catch {
-        try {
-          await supabaseAdmin.auth.admin.updateUserById(profile.id, {
-            password: password || 'Password123!',
-          });
-        } catch {
-          // Continue
-        }
-      }
-
-      const { data: retryAuth } = await supabaseAdmin.auth.signInWithPassword({
-        email: profile.email,
-        password: password || 'Password123!',
+    if (authError || !authData?.session) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid password. Please enter the correct password for your account.',
       });
-      sessionToken = retryAuth?.session?.access_token || null;
     }
 
     return res.json({
       success: true,
       data: {
         profile,
-        token: sessionToken,
+        token: authData.session.access_token,
       },
     });
   } catch (err: any) {

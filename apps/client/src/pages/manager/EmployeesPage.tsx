@@ -72,6 +72,12 @@ export const EmployeesPage: React.FC = () => {
     setError(null);
 
     try {
+      if (!editingEmployee && (!password || password.length < 6)) {
+        setError('Please provide a temporary password of at least 6 characters');
+        setSubmitting(false);
+        return;
+      }
+
       if (editingEmployee) {
         await EmployeeService.updateEmployee(editingEmployee.id, {
           name,
@@ -84,7 +90,7 @@ export const EmployeesPage: React.FC = () => {
           email,
           role,
           department: department || undefined,
-          password: password || undefined,
+          password,
         });
       }
       setIsModalOpen(false);
@@ -350,14 +356,19 @@ export const EmployeesPage: React.FC = () => {
 
               {!editingEmployee && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700">Initial Password</label>
+                  <label className="block text-xs font-semibold text-slate-700">Temporary Password *</label>
                   <input
                     type="password"
+                    required
+                    minLength={6}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Defaults to Password123!"
-                    className="mt-1 w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                    placeholder="Create temporary password (min 6 characters)"
+                    className="mt-1 w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    Employee will use this password to sign in to their dashboard.
+                  </span>
                 </div>
               )}
 
