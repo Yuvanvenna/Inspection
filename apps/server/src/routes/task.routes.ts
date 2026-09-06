@@ -16,7 +16,7 @@ taskRouter.get('/tasks', async (req: Request, res: Response) => {
         *,
         stage:workflow_stages(id, name, stage_order),
         project:projects(id, name, client:clients(name)),
-        assigned_profile:profiles(id, name, email, department),
+        assigned_to_profile:profiles(id, name, email, department),
         work_updates:work_updates(*)
       `)
       .order('deadline', { ascending: true });
@@ -27,7 +27,7 @@ taskRouter.get('/tasks', async (req: Request, res: Response) => {
     if (stageId) {
       query = query.eq('stage_id', String(stageId));
     }
-    if (assignedTo) {
+    if (assignedTo && assignedTo !== 'undefined') {
       query = query.eq('assigned_to', String(assignedTo));
     }
 
@@ -36,7 +36,13 @@ taskRouter.get('/tasks', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: error.message });
     }
 
-    return res.json({ success: true, data: data || [] });
+    const formatted = (data || []).map((t: any) => ({
+      ...t,
+      assigned_to_profile: t.assigned_to_profile || t.assigned_profile,
+      assigned_profile: t.assigned_to_profile || t.assigned_profile,
+    }));
+
+    return res.json({ success: true, data: formatted });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }

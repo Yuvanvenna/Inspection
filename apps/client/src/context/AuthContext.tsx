@@ -128,6 +128,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const profile = json.data.profile as UserProfile;
         setUser(profile);
         localStorage.setItem('ag_active_user', JSON.stringify(profile));
+
+        // Sign in Supabase client instance so RLS auth.uid() is active
+        try {
+          if (json.data?.token) {
+            await supabase.auth.setSession({
+              access_token: json.data.token,
+              refresh_token: json.data.token,
+            });
+          } else {
+            await supabase.auth.signInWithPassword({
+              email: cleanEmail,
+              password: password || 'Password123!',
+            });
+          }
+        } catch (authSyncErr) {
+          console.warn('Supabase client auth sync note:', authSyncErr);
+        }
+
         setLoading(false);
         return { role: profile.role };
       } else if (json.error) {
@@ -140,11 +158,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 2. Direct Supabase query fallback
     try {
-      const { data: profile, error: profError } = await supabase
-        .from('profiles')
-        .select('*')
-        .ilike('email', cleanEmail)
-        .maybeSingle();
+      // First sign in with Supabase auth so auth.uid() is defined for RLS
+      const { data: authData } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: password || 'Password123!',
+      });
+
+      const profileId = authData?.user?.id;
+      let query = supabase.from('profiles').select('*');
+      if (profileId) {
+        query = query.eq('id', profileId);
+      } else {
+        query = query.ilike('email', cleanEmail);
+      }
+
+      const { data: profile, error: profError } = await query.maybeSingle();
 
       if (!profError && profile) {
         setUser(profile);
