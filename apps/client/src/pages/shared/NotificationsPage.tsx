@@ -38,6 +38,15 @@ export const NotificationsPage: React.FC = () => {
 
   useEffect(() => {
     loadNotifications();
+
+    const handleEvent = () => {
+      loadNotifications();
+    };
+    window.addEventListener('inspection:notification-change', handleEvent);
+
+    return () => {
+      window.removeEventListener('inspection:notification-change', handleEvent);
+    };
   }, [user]);
 
   const handleRefresh = () => {

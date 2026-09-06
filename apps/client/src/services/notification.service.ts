@@ -51,6 +51,8 @@ export const NotificationService = {
 
     if (error) {
       console.error('Failed to mark notification as read:', error);
+    } else {
+      window.dispatchEvent(new CustomEvent('inspection:notification-change'));
     }
   },
 
@@ -66,6 +68,8 @@ export const NotificationService = {
 
     if (error) {
       console.error('Failed to mark all notifications as read:', error);
+    } else {
+      window.dispatchEvent(new CustomEvent('inspection:notification-change'));
     }
   },
 
@@ -83,16 +87,52 @@ export const NotificationService = {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      await fetch(`${API_URL}/notifications`, {
+      // Extract current active user from localStorage if available
+      let currentUserId = input.user_id;
+      try {
+        const stored = localStorage.getItem('ag_active_user');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed?.id) currentUserId = parsed.id;
+        }
+      } catch {}
+
+      const res = await fetch(`${API_URL}/notifications`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-user-id': currentUserId,
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(input),
       });
+
+      if (!res.ok) {
+        // Fallback: direct insert to supabase notifications table
+        await supabase.from('notifications').insert([{
+          user_id: input.user_id,
+          type: input.type,
+          title: input.title,
+          message: input.message,
+          link_url: input.link_url || null,
+        }]);
+      }
+
+      window.dispatchEvent(new CustomEvent('inspection:notification-change'));
     } catch (err) {
-      console.error('Failed to send notification via API:', err);
+      console.error('Failed to send notification via API, using direct insert:', err);
+      try {
+        await supabase.from('notifications').insert([{
+          user_id: input.user_id,
+          type: input.type,
+          title: input.title,
+          message: input.message,
+          link_url: input.link_url || null,
+        }]);
+        window.dispatchEvent(new CustomEvent('inspection:notification-change'));
+      } catch (insertErr) {
+        console.error('Direct notification insert failed:', insertErr);
+      }
     }
   },
 
@@ -109,14 +149,26 @@ export const NotificationService = {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
+      let currentUserId = '';
+      try {
+        const stored = localStorage.getItem('ag_active_user');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed?.id) currentUserId = parsed.id;
+        }
+      } catch {}
+
       await fetch(`${API_URL}/notifications/notify-managers`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(currentUserId ? { 'x-user-id': currentUserId } : {}),
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(input),
       });
+
+      window.dispatchEvent(new CustomEvent('inspection:notification-change'));
     } catch (err) {
       console.error('Failed to notify managers via API:', err);
     }

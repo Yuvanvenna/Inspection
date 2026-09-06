@@ -14,6 +14,8 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { NotificationService } from '../../services/notification.service';
 import { Notification, NotificationType } from '@antigravity/shared';
+import { supabase } from '../../lib/supabase';
+import { playNotificationSound, isSoundEnabled } from '../../utils/sound';
 
 export const TopHeader: React.FC<{ title?: string; onMenuClick?: () => void }> = ({
   title,
@@ -25,6 +27,7 @@ export const TopHeader: React.FC<{ title?: string; onMenuClick?: () => void }> =
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [popoverOpen, setPopoverOpen] = useState<boolean>(false);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const lastUnreadRef = useRef<number | null>(null);
 
   const fetchNotificationData = async () => {
     if (!user) return;
@@ -33,6 +36,15 @@ export const TopHeader: React.FC<{ title?: string; onMenuClick?: () => void }> =
         NotificationService.getUnreadCount(user.id),
         NotificationService.getNotifications(user.id),
       ]);
+
+      // If count increased after initial fetch, chime sound
+      if (lastUnreadRef.current !== null && count > lastUnreadRef.current) {
+        if (isSoundEnabled(user.id)) {
+          playNotificationSound();
+        }
+      }
+      lastUnreadRef.current = count;
+
       setUnreadCount(count);
       setNotifications(list.slice(0, 5)); // top 5 for the quick flyout
     } catch (err) {
@@ -41,10 +53,44 @@ export const TopHeader: React.FC<{ title?: string; onMenuClick?: () => void }> =
   };
 
   useEffect(() => {
+    if (!user) return;
+
     fetchNotificationData();
-    // Poll every 30 seconds for live notifications
-    const interval = setInterval(fetchNotificationData, 30000);
-    return () => clearInterval(interval);
+
+    // 1. Ultra-responsive 4-second poll interval as resilient fallback
+    const interval = setInterval(fetchNotificationData, 4000);
+
+    // 2. Real-time PostgreSQL changes subscription via Supabase Realtime
+    const channel = supabase
+      .channel(`rt-notifications-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          fetchNotificationData();
+          if (payload.eventType === 'INSERT' && isSoundEnabled(user.id)) {
+            playNotificationSound();
+          }
+        }
+      )
+      .subscribe();
+
+    // 3. Custom event for local instant trigger across tabs/actions
+    const handleNotificationEvent = () => {
+      fetchNotificationData();
+    };
+    window.addEventListener('inspection:notification-change', handleNotificationEvent);
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+      window.removeEventListener('inspection:notification-change', handleNotificationEvent);
+    };
   }, [user]);
 
   // Click outside to close popover

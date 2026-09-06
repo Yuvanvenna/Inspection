@@ -1,22 +1,78 @@
-import React, { useState } from 'react';
-import { Save } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Save, Volume2, VolumeX } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { isSoundEnabled, setSoundEnabled, playNotificationSound } from '../../utils/sound';
+import { supabase } from '../../lib/supabase';
 
 export const ProfilePage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { showToast } = useToast();
   const [saving, setSaving] = useState(false);
-  const [department, setDepartment] = useState(user?.department || 'Backend Engineering');
-  const [emailAlerts, setEmailAlerts] = useState(true);
-  const [inAppSound, setInAppSound] = useState(false);
 
-  const handleSave = () => {
+  // Initialize from saved preferences or user object
+  const [department, setDepartment] = useState(() => {
+    return user?.department || localStorage.getItem(`inspection_pref_dept_${user?.id}`) || 'Backend Engineering';
+  });
+
+  const [emailAlerts, setEmailAlerts] = useState<boolean>(() => {
+    const saved = localStorage.getItem(`inspection_pref_email_${user?.id}`);
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  const [inAppSound, setInAppSound] = useState<boolean>(() => {
+    return isSoundEnabled(user?.id);
+  });
+
+  useEffect(() => {
+    if (user?.id) {
+      setInAppSound(isSoundEnabled(user.id));
+      const savedDept = localStorage.getItem(`inspection_pref_dept_${user.id}`);
+      if (savedDept) setDepartment(savedDept);
+      else if (user.department) setDepartment(user.department);
+    }
+  }, [user?.id]);
+
+  const handleSoundToggle = (enabled: boolean) => {
+    setInAppSound(enabled);
+    setSoundEnabled(enabled, user?.id);
+    if (enabled) {
+      playNotificationSound();
+      showToast('Notification chime enabled (sample sound played)', 'info');
+    } else {
+      showToast('Notification chime muted', 'info');
+    }
+  };
+
+  const handleSave = async () => {
     setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      // 1. Persist preferences to localStorage
+      if (user?.id) {
+        localStorage.setItem(`inspection_pref_dept_${user.id}`, department);
+        localStorage.setItem(`inspection_pref_email_${user.id}`, String(emailAlerts));
+        setSoundEnabled(inAppSound, user.id);
+      }
+
+      // 2. Try to update department in Supabase profiles if possible
+      if (user?.id) {
+        await supabase
+          .from('profiles')
+          .update({ department })
+          .eq('id', user.id);
+
+        if (refreshUser) {
+          await refreshUser();
+        }
+      }
+
       showToast('Profile preferences saved successfully!', 'success');
-    }, 300);
+    } catch (err: any) {
+      console.warn('Could not update remote profile, saved locally:', err);
+      showToast('Preferences saved to browser storage!', 'success');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -102,15 +158,32 @@ export const ProfilePage: React.FC = () => {
               />
             </div>
             <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-lg border border-slate-200">
-              <div>
-                <span className="text-xs font-bold text-slate-800 block">Audio Notification Chimes</span>
-                <p className="text-[11px] text-slate-500">Play a subtle chime when real-time alerts arrive.</p>
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${inAppSound ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
+                  {inAppSound ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-800 block">Audio Notification Chimes</span>
+                    {inAppSound && (
+                      <button
+                        type="button"
+                        onClick={() => playNotificationSound()}
+                        className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold underline cursor-pointer"
+                        title="Test sound"
+                      >
+                        (Test Chime)
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500">Play a subtle chime when real-time alerts arrive.</p>
+                </div>
               </div>
               <input
                 type="checkbox"
                 checked={inAppSound}
-                onChange={(e) => setInAppSound(e.target.checked)}
-                className="w-4 h-4 text-indigo-600 rounded"
+                onChange={(e) => handleSoundToggle(e.target.checked)}
+                className="w-4 h-4 text-indigo-600 rounded cursor-pointer"
               />
             </div>
           </div>
