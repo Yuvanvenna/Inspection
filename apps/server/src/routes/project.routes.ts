@@ -162,6 +162,60 @@ projectRouter.post('/projects', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/projects/:id/members - Add member to project
+projectRouter.post('/projects/:id/members', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { user_id } = req.body;
+
+    if (!user_id) {
+      return res.status(400).json({ success: false, error: 'user_id is required' });
+    }
+
+    const { data: existing } = await supabaseAdmin
+      .from('project_members')
+      .select('id')
+      .eq('project_id', id)
+      .eq('user_id', user_id)
+      .maybeSingle();
+
+    if (!existing) {
+      const { error } = await supabaseAdmin
+        .from('project_members')
+        .insert([{ project_id: id, user_id }]);
+
+      if (error) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
+    }
+
+    return res.json({ success: true, message: 'Member added to project successfully' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/projects/:id/members/:userId - Remove member from project
+projectRouter.delete('/projects/:id/members/:userId', async (req: Request, res: Response) => {
+  try {
+    const { id, userId } = req.params;
+
+    const { error } = await supabaseAdmin
+      .from('project_members')
+      .delete()
+      .eq('project_id', id)
+      .eq('user_id', userId);
+
+    if (error) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+
+    return res.json({ success: true, message: 'Member removed from project' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // GET /api/dashboard/manager - Aggregate live metrics for Manager Dashboard
 projectRouter.get('/dashboard/manager', async (req: Request, res: Response) => {
   try {

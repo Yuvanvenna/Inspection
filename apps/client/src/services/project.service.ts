@@ -221,4 +221,44 @@ export const ProjectService = {
 
     return data;
   },
+
+  async addMember(projectId: string, userId: string): Promise<void> {
+    try {
+      const res = await fetch(`${API_URL}/projects/${projectId}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
+      });
+      if (res.ok) return;
+    } catch (e) {
+      console.warn('API addMember failed, falling back to Supabase:', e);
+    }
+
+    const { error } = await supabase
+      .from('project_members')
+      .insert([{ project_id: projectId, user_id: userId }]);
+    if (error && !error.message.includes('duplicate')) {
+      throw new Error(error.message);
+    }
+  },
+
+  async removeMember(projectId: string, userId: string): Promise<void> {
+    try {
+      const res = await fetch(`${API_URL}/projects/${projectId}/members/${userId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) return;
+    } catch (e) {
+      console.warn('API removeMember failed, falling back to Supabase:', e);
+    }
+
+    const { error } = await supabase
+      .from('project_members')
+      .delete()
+      .eq('project_id', projectId)
+      .eq('user_id', userId);
+    if (error) {
+      throw new Error(error.message);
+    }
+  },
 };

@@ -124,6 +124,26 @@ export const TaskService = {
       throw new Error(`Failed to create task: ${error.message}`);
     }
 
+    // Ensure assigned employee is member of the project
+    if (input.assigned_to) {
+      try {
+        const { data: existingMember } = await supabase
+          .from('project_members')
+          .select('id')
+          .eq('project_id', input.project_id)
+          .eq('user_id', input.assigned_to)
+          .maybeSingle();
+
+        if (!existingMember) {
+          await supabase
+            .from('project_members')
+            .insert([{ project_id: input.project_id, user_id: input.assigned_to }]);
+        }
+      } catch (pmErr) {
+        console.warn('Could not auto-add to project_members:', pmErr);
+      }
+    }
+
     // Trigger stage recalculation via server
     await this.triggerStageRecalculate(input.stage_id);
 
