@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { ProjectService, CreateProjectInput } from '../../services/project.service';
 import { ClientService } from '../../services/client.service';
+import { EmployeeService } from '../../services/employee.service';
 import { supabase } from '../../lib/supabase';
 import {
   Project,
@@ -67,15 +68,15 @@ export const ProjectsPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [projData, clientData, { data: profiles }] = await Promise.all([
+      const [projData, clientData, empData] = await Promise.all([
         ProjectService.getProjects(),
         ClientService.getClients(),
-        supabase.from('profiles').select('*').eq('role', 'EMPLOYEE').eq('status', 'ACTIVE'),
+        EmployeeService.getEmployees().catch(() => []),
       ]);
 
       setProjects(projData);
       setClients(clientData);
-      setEmployees(profiles || []);
+      setEmployees(empData || []);
 
       if (clientData.length > 0 && !formData.client_id) {
         setFormData((prev) => ({ ...prev, client_id: clientData[0].id }));
@@ -534,38 +535,64 @@ export const ProjectsPage: React.FC = () => {
               {/* Tab 4: Team Staffing */}
               {activeTab === 'team' && (
                 <div className="space-y-3">
-                  <p className="text-xs text-slate-500 font-medium">
-                    Select team members who are authorized to work on this project and receive tasks:
-                  </p>
-                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
-                    {employees.map((emp) => {
-                      const isSelected = (formData.member_ids || []).includes(emp.id);
-                      return (
-                        <button
-                          key={emp.id}
-                          type="button"
-                          onClick={() => toggleMember(emp.id)}
-                          className={`p-3 rounded-lg border text-left flex items-center gap-3 transition-colors ${
-                            isSelected
-                              ? 'bg-indigo-50 border-indigo-500 text-indigo-900'
-                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                          }`}
-                        >
-                          <div
-                            className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs ${
-                              isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600'
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-slate-500 font-medium">
+                      Select team members who are authorized to work on this project and receive tasks:
+                    </p>
+                    <span className="text-[11px] text-slate-400 font-semibold">
+                      {(formData.member_ids || []).length} selected
+                    </span>
+                  </div>
+
+                  {employees.length === 0 ? (
+                    <div className="p-6 bg-slate-50 border border-slate-200 rounded-xl text-center space-y-1.5">
+                      <p className="text-xs font-bold text-slate-700">No Employee Accounts Found</p>
+                      <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                        You can create the project now and assign team members or tasks anytime from the project details page.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
+                      {employees.map((emp) => {
+                        const isSelected = (formData.member_ids || []).includes(emp.id);
+                        return (
+                          <button
+                            key={emp.id}
+                            type="button"
+                            onClick={() => toggleMember(emp.id)}
+                            className={`p-3 rounded-lg border text-left flex items-center gap-3 transition-colors ${
+                              isSelected
+                                ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-1 ring-indigo-500/20'
+                                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                             }`}
                           >
-                            {emp.name.charAt(0)}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-bold truncate">{emp.name}</p>
-                            <p className="text-[10px] text-slate-400 truncate">{emp.department || 'Engineer'}</p>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                            <div
+                              className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${
+                                isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600'
+                              }`}
+                            >
+                              {emp.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-bold truncate">{emp.name}</p>
+                              <p className="text-[10px] text-slate-400 truncate">
+                                {emp.department || emp.role || 'Staff'}
+                              </p>
+                            </div>
+                            <div
+                              className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] font-bold ${
+                                isSelected
+                                  ? 'bg-indigo-600 border-indigo-600 text-white'
+                                  : 'border-slate-300 bg-white'
+                              }`}
+                            >
+                              {isSelected && '✓'}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
 
