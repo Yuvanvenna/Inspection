@@ -1,5 +1,11 @@
 import { supabase } from '../lib/supabase';
-import { Project, Priority, ProjectStatus } from '@antigravity/shared';
+import {
+  Project,
+  Priority,
+  ProjectStatus,
+  calculateStageProgress,
+  calculateProjectProgress,
+} from '@antigravity/shared';
 import { API_URL } from '../lib/api';
 
 export interface CreateProjectInput {
@@ -28,6 +34,24 @@ export interface CreateProjectInput {
   technical_notes?: string;
 
   member_ids?: string[];
+}
+
+function applyLiveProjectProgress(data: any): any {
+  if (!data) return data;
+  if (data.stages) {
+    data.stages.sort((a: any, b: any) => a.stage_order - b.stage_order);
+    for (const st of data.stages) {
+      if (st.tasks && st.tasks.length > 0 && (st.manager_override === null || st.manager_override === undefined)) {
+        const live = calculateStageProgress(st.tasks);
+        if (live !== null) {
+          st.calculated_progress = live;
+          st.effective_progress = live;
+        }
+      }
+    }
+    data.overall_progress = calculateProjectProgress(data.stages);
+  }
+  return data;
 }
 
 export const ProjectService = {
@@ -105,7 +129,7 @@ export const ProjectService = {
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.data) {
-          return json.data;
+          return applyLiveProjectProgress(json.data);
         }
       }
     } catch (apiErr) {
@@ -141,11 +165,7 @@ export const ProjectService = {
       data.members = [];
     }
 
-    if (data.stages) {
-      data.stages.sort((a: any, b: any) => a.stage_order - b.stage_order);
-    }
-
-    return data;
+    return applyLiveProjectProgress(data);
   },
 
   async createProject(input: CreateProjectInput, creatorId?: string): Promise<Project> {

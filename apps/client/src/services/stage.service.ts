@@ -7,6 +7,18 @@ import {
 } from '@antigravity/shared';
 import { API_URL } from '../lib/api';
 
+function applyLiveStageProgress(stage: any): any {
+  if (!stage) return stage;
+  if (stage.tasks && stage.tasks.length > 0) {
+    const liveCalc = calculateStageProgress(stage.tasks);
+    if (liveCalc !== null) {
+      stage.calculated_progress = liveCalc;
+      stage.effective_progress = determineEffectiveProgress(liveCalc, stage.manager_override);
+    }
+  }
+  return stage;
+}
+
 export const StageService = {
   async getStageById(id: string): Promise<
     WorkflowStage & {
@@ -36,7 +48,7 @@ export const StageService = {
               (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
             );
           }
-          return stage;
+          return applyLiveStageProgress(stage);
         }
       }
     } catch (e) {
@@ -71,16 +83,7 @@ export const StageService = {
       );
     }
 
-    // Self-healing: if tasks exist, compute exact progress in case backend trigger was missed
-    if (stage.tasks && stage.tasks.length > 0) {
-      const liveCalc = calculateStageProgress(stage.tasks);
-      if (liveCalc !== null) {
-        stage.calculated_progress = liveCalc;
-        stage.effective_progress = determineEffectiveProgress(liveCalc, stage.manager_override);
-      }
-    }
-
-    return stage;
+    return applyLiveStageProgress(stage);
   },
 
   async setStageOverride(

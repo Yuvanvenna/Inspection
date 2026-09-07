@@ -290,6 +290,33 @@ taskRouter.post('/work-updates', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: error.message });
     }
 
+    // Automatically synchronize parent task's progress and status on server
+    try {
+      const taskUpdates: any = {
+        progress: progress_at_update,
+        status: status_at_update,
+        updated_at: new Date().toISOString(),
+      };
+      if (status_at_update === 'COMPLETED' || progress_at_update === 100) {
+        taskUpdates.status = 'COMPLETED';
+        taskUpdates.progress = 100;
+        taskUpdates.completed_at = new Date().toISOString();
+      }
+
+      const { data: updatedTask } = await supabaseAdmin
+        .from('tasks')
+        .update(taskUpdates)
+        .eq('id', task_id)
+        .select('id, stage_id, project_id')
+        .single();
+
+      if (updatedTask?.stage_id) {
+        await ProgressService.recalculateStage(updatedTask.stage_id);
+      }
+    } catch (syncErr) {
+      console.warn('Auto task/stage sync after work update warning:', syncErr);
+    }
+
     return res.status(201).json({ success: true, data: update });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
