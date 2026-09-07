@@ -14,7 +14,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { STAGE_DISPLAY_NAMES, StageName } from '@antigravity/shared';
+import { STAGE_DISPLAY_NAMES, StageName, calculateProjectProgress } from '@antigravity/shared';
 import { KPISkeleton, StageTrackerSkeleton, TaskCardSkeleton, TimelineSkeleton } from '../../components/common/Skeletons';
 import { API_URL } from '../../lib/api';
 
@@ -72,7 +72,14 @@ export const ManagerDashboard: React.FC = () => {
             setTotalTasksCount(json.data.totalTasksCount ?? 0);
             setBlockedTasks(json.data.blockedTasks || []);
             setOverdueTasksCount(json.data.overdueTasksCount ?? 0);
-            setFeaturedProject(json.data.featuredProject || null);
+            if (json.data.featuredProject) {
+              const feat = { ...json.data.featuredProject };
+              if (feat.stages) {
+                feat.stages.sort((a: any, b: any) => a.stage_order - b.stage_order);
+                feat.overall_progress = calculateProjectProgress(feat.stages);
+              }
+              setFeaturedProject(feat);
+            }
             setRecentUpdates(json.data.recentUpdates || []);
             setLoading(false);
             setRefreshing(false);
@@ -101,9 +108,10 @@ export const ManagerDashboard: React.FC = () => {
         const active = projectsData.filter((p) => p.status === 'ACTIVE');
         setActiveProjectsCount(active.length || projectsData.length);
         if (projectsData.length > 0) {
-          const feat = projectsData[0];
+          const feat = { ...projectsData[0] };
           if (feat.stages) {
             feat.stages.sort((a: any, b: any) => a.stage_order - b.stage_order);
+            feat.overall_progress = calculateProjectProgress(feat.stages);
           }
           setFeaturedProject(feat as any);
         }

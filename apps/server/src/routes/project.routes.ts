@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { supabaseAdmin } from '../config/supabase';
-import { FIXED_STAGE_ORDER } from '@antigravity/shared';
+import { FIXED_STAGE_ORDER, calculateProjectProgress } from '@antigravity/shared';
 
 export const projectRouter = Router();
 
@@ -51,7 +51,14 @@ projectRouter.get('/projects', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: error.message });
     }
 
-    return res.json({ success: true, data: data || [] });
+    const formatted = (data || []).map((p: any) => {
+      if (p.stages && p.stages.length > 0) {
+        p.overall_progress = calculateProjectProgress(p.stages);
+      }
+      return p;
+    });
+
+    return res.json({ success: true, data: formatted });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -321,6 +328,7 @@ projectRouter.get('/dashboard/manager', async (req: Request, res: Response) => {
       const feat = { ...projects[0] };
       if (feat.stages) {
         feat.stages.sort((a: any, b: any) => a.stage_order - b.stage_order);
+        feat.overall_progress = calculateProjectProgress(feat.stages);
       }
       featuredProject = feat;
     }

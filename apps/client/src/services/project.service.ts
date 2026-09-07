@@ -62,7 +62,7 @@ export const ProjectService = {
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
-          return json.data;
+          return json.data.map(applyLiveProjectProgress);
         }
       }
     } catch (apiErr) {
@@ -83,7 +83,7 @@ export const ProjectService = {
       throw new Error(`Failed to fetch projects: ${error.message}`);
     }
 
-    return data || [];
+    return (data || []).map(applyLiveProjectProgress);
   },
 
   async getAssignedProjects(employeeId: string): Promise<Project[]> {
@@ -93,7 +93,7 @@ export const ProjectService = {
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
-          return json.data;
+          return json.data.map(applyLiveProjectProgress);
         }
       }
     } catch (apiErr) {
@@ -119,7 +119,7 @@ export const ProjectService = {
       .in('id', projectIds)
       .order('deadline', { ascending: true });
 
-    return projs || [];
+    return (projs || []).map(applyLiveProjectProgress);
   },
 
   async getProjectById(id: string): Promise<Project> {
