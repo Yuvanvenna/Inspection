@@ -1,7 +1,11 @@
 import { supabase } from '../lib/supabase';
-import { WorkflowStage, StageOverrideHistory } from '@antigravity/shared';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import {
+  WorkflowStage,
+  StageOverrideHistory,
+  calculateStageProgress,
+  determineEffectiveProgress,
+} from '@antigravity/shared';
+import { API_URL } from '../lib/api';
 
 export const StageService = {
   async getStageById(id: string): Promise<
@@ -65,6 +69,15 @@ export const StageService = {
       stage.override_history.sort(
         (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
+    }
+
+    // Self-healing: if tasks exist, compute exact progress in case backend trigger was missed
+    if (stage.tasks && stage.tasks.length > 0) {
+      const liveCalc = calculateStageProgress(stage.tasks);
+      if (liveCalc !== null) {
+        stage.calculated_progress = liveCalc;
+        stage.effective_progress = determineEffectiveProgress(liveCalc, stage.manager_override);
+      }
     }
 
     return stage;

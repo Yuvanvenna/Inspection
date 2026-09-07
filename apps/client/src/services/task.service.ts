@@ -1,6 +1,15 @@
 import { supabase } from '../lib/supabase';
-import { Task, TaskStatus, Priority } from '@antigravity/shared';
+import {
+  Task,
+  TaskStatus,
+  Priority,
+  calculateStageProgress,
+  deriveStageStatus,
+  determineEffectiveProgress,
+  calculateProjectProgress,
+} from '@antigravity/shared';
 import { NotificationService } from './notification.service';
+import { API_URL } from '../lib/api';
 
 export interface CreateTaskInput {
   project_id: string;
@@ -13,8 +22,6 @@ export interface CreateTaskInput {
   status?: TaskStatus;
   progress?: number;
 }
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export const TaskService = {
   async getTasks(filters?: {
@@ -249,6 +256,7 @@ export const TaskService = {
       });
 
       if (res.ok) {
+        await this.triggerStageRecalculate(stageId);
         return;
       }
     } catch (e) {
@@ -266,7 +274,7 @@ export const TaskService = {
       throw new Error(`Failed to update task progress: ${error.message}`);
     }
 
-    // Trigger stage recalculation via server
+    // Trigger stage recalculation via server & direct client sync
     await this.triggerStageRecalculate(stageId);
 
     // Broadcast escalation if task is BLOCKED
@@ -293,6 +301,7 @@ export const TaskService = {
         method: 'DELETE',
       });
       if (res.ok) {
+        await this.triggerStageRecalculate(stageId);
         return;
       }
     } catch (e) {
@@ -308,13 +317,72 @@ export const TaskService = {
   },
 
   async triggerStageRecalculate(stageId: string): Promise<void> {
+    // 1. First attempt to call the backend recalculate endpoint
+    let apiSucceeded = false;
     try {
-      await fetch(`${API_URL}/stages/${stageId}/recalculate`, {
+      const res = await fetch(`${API_URL}/stages/${stageId}/recalculate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
+      if (res.ok) {
+        apiSucceeded = true;
+      }
     } catch {
-      // Fallback: If server is offline during dev, calculation is reflected on reload
+      apiSucceeded = false;
+    }
+
+    // 2. Client-side direct recalculation fallback (ensures stage & project progress ALWAYS stay accurate)
+    try {
+      const { data: tasks } = await supabase
+        .from('tasks')
+        .select('progress, status')
+        .eq('stage_id', stageId);
+
+      const { data: stage } = await supabase
+        .from('workflow_stages')
+        .select('id, project_id, manager_override')
+        .eq('id', stageId)
+        .single();
+
+      if (stage && tasks) {
+        const calculatedProgress = calculateStageProgress(tasks);
+        const stageStatus = deriveStageStatus(tasks);
+        const effectiveProgress = determineEffectiveProgress(
+          calculatedProgress,
+          stage.manager_override
+        );
+
+        await supabase
+          .from('workflow_stages')
+          .update({
+            calculated_progress: calculatedProgress,
+            effective_progress: effectiveProgress,
+            status: stageStatus,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', stageId);
+
+        // Also update parent project overall progress
+        const { data: allStages } = await supabase
+          .from('workflow_stages')
+          .select('effective_progress')
+          .eq('project_id', stage.project_id);
+
+        if (allStages) {
+          const overall = calculateProjectProgress(allStages);
+          await supabase
+            .from('projects')
+            .update({
+              overall_progress: overall,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', stage.project_id);
+        }
+      }
+    } catch (clientRecalcErr) {
+      if (!apiSucceeded) {
+        console.warn('Direct stage recalculation warning:', clientRecalcErr);
+      }
     }
   },
 };

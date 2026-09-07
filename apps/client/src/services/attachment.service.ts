@@ -1,8 +1,8 @@
 import { supabase } from '../lib/supabase';
 import { Attachment } from '@antigravity/shared';
+import { API_URL } from '../lib/api';
 
 const BUCKET_NAME = 'project-attachments';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 /**
  * Converts a browser File object to Base64 data string.

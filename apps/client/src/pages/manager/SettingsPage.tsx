@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { API_URL } from '../../lib/api';
 
 interface SystemConfig {
   platformName: string;
@@ -42,8 +43,6 @@ const DEFAULT_CONFIG: SystemConfig = {
   stageOverrideNotifications: true,
   sessionTimeoutHours: 8,
 };
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export const SettingsPage: React.FC = () => {
   const { user } = useAuth();

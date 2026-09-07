@@ -16,8 +16,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import { STAGE_DISPLAY_NAMES, StageName } from '@antigravity/shared';
 import { KPISkeleton, StageTrackerSkeleton, TaskCardSkeleton, TimelineSkeleton } from '../../components/common/Skeletons';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { API_URL } from '../../lib/api';
 
 interface ProjectSummary {
   id: string;

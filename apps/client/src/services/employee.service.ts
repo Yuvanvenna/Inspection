@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { UserProfile, Role, UserStatus } from '@antigravity/shared';
+import { API_URL } from '../lib/api';
 
 export interface CreateEmployeeInput {
   name: string;
@@ -8,8 +9,6 @@ export interface CreateEmployeeInput {
   department?: string;
   password?: string;
 }
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export const EmployeeService = {
   async getEmployees(): Promise<

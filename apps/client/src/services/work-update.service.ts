@@ -1,8 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { WorkUpdate } from '@antigravity/shared';
 import { TaskService } from './task.service';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { API_URL } from '../lib/api';
 
 export const WorkUpdateService = {
   async getUpdatesByTaskId(taskId: string): Promise<WorkUpdate[]> {
