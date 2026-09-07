@@ -9,6 +9,7 @@ export interface AuthenticatedRequest extends Request {
     role: Role;
     name: string;
   };
+  body: any;
 }
 
 export async function requireAuth(
