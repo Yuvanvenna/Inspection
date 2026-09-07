@@ -114,7 +114,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (json.data?.token) {
             await supabase.auth.setSession({
               access_token: json.data.token,
-              refresh_token: json.data.token,
+              refresh_token: json.data.refresh_token || json.data.token,
             });
           } else {
             await supabase.auth.signInWithPassword({

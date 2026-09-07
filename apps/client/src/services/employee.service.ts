@@ -78,15 +78,46 @@ export const EmployeeService = {
     id: string,
     updates: Partial<{ name: string; department: string; status: UserStatus; role: Role }>
   ): Promise<UserProfile> {
+    // 1. Primary: Update via server API with service role (avoids client RLS session mismatch)
+    try {
+      const response = await fetch(`${API_URL}/employees/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+
+      if (response.ok) {
+        const json = await response.json();
+        if (json.success && json.data) {
+          return json.data;
+        }
+      } else {
+        const errJson = await response.json().catch(() => null);
+        if (errJson?.error?.message) {
+          throw new Error(errJson.error.message);
+        }
+      }
+    } catch (apiErr: any) {
+      if (apiErr.message && !apiErr.message.includes('fetch')) {
+        throw apiErr;
+      }
+      console.warn('API updateEmployee failed, trying direct Supabase fallback:', apiErr);
+    }
+
+    // 2. Direct Supabase fallback
     const { data, error } = await supabase
       .from('profiles')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       throw new Error(`Failed to update employee: ${error.message}`);
+    }
+
+    if (!data) {
+      throw new Error('Employee record could not be updated. Please ensure you are logged in as a manager.');
     }
 
     return data;
@@ -96,4 +127,16 @@ export const EmployeeService = {
     const newStatus: UserStatus = currentStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
     return this.updateEmployee(id, { status: newStatus });
   },
+
+  async deleteEmployee(id: string): Promise<void> {
+    const res = await fetch(`${API_URL}/employees/${id}`, {
+      method: 'DELETE',
+    });
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => null);
+      throw new Error(errJson?.error || 'Failed to delete employee');
+    }
+  },
 };
+

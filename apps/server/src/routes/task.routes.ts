@@ -220,6 +220,50 @@ taskRouter.delete('/tasks/:id', async (req: Request, res: Response) => {
   }
 });
 
+// DELETE /api/tasks/:id - Delete task and recalculate stage and project progress
+taskRouter.delete('/tasks/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Fetch task to get its stage_id and project_id
+    const { data: task, error: fetchErr } = await supabaseAdmin
+      .from('tasks')
+      .select('id, title, stage_id, project_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (fetchErr || !task) {
+      return res.status(404).json({ success: false, error: 'Task not found' });
+    }
+
+    // 2. Delete task (cascades to work_updates and task attachments)
+    const { error: deleteErr } = await supabaseAdmin
+      .from('tasks')
+      .delete()
+      .eq('id', id);
+
+    if (deleteErr) {
+      return res.status(400).json({ success: false, error: deleteErr.message });
+    }
+
+    // 3. Immediately recalculate stage & project progress atomically
+    try {
+      await ProgressService.recalculateStage(task.stage_id);
+    } catch (calcErr: any) {
+      console.warn('Progress recalculation note after task deletion:', calcErr.message);
+    }
+
+    return res.json({
+      success: true,
+      message: `Task "${task.title}" deleted and progress recalculated successfully.`,
+      stage_id: task.stage_id,
+      project_id: task.project_id,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // POST /api/work-updates - Create append-only work update
 taskRouter.post('/work-updates', async (req: Request, res: Response) => {
   try {

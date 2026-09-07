@@ -96,6 +96,109 @@ employeeRouter.post('/employees', async (req: Request, res: Response) => {
   }
 });
 
+// PATCH /api/employees/:id - Update employee profile (bypasses RLS)
+employeeRouter.patch('/employees/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, department, status, role } = req.body;
+
+    const updates: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (name !== undefined) updates.name = name;
+    if (department !== undefined) updates.department = department;
+    if (status !== undefined) updates.status = status;
+    if (role !== undefined) updates.role = role;
+
+    const { data: updated, error } = await supabaseAdmin
+      .from('profiles')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: updated,
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: { message: err.message },
+    });
+  }
+});
+
+// DELETE /api/employees/:id - Delete employee profile and auth account (bypasses RLS)
+employeeRouter.delete('/employees/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Fetch employee to check role
+    const { data: profile, error: fetchErr } = await supabaseAdmin
+      .from('profiles')
+      .select('id, name, role')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (fetchErr || !profile) {
+      return res.status(404).json({ success: false, error: 'Employee not found' });
+    }
+
+    // 2. Reassign any assigned tasks to an active manager to prevent foreign key violations
+    const { data: managerProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('role', 'MANAGER')
+      .neq('id', id)
+      .limit(1)
+      .maybeSingle();
+
+    if (managerProfile) {
+      await supabaseAdmin
+        .from('tasks')
+        .update({ assigned_to: managerProfile.id })
+        .eq('assigned_to', id);
+    }
+
+    // 3. Remove project memberships & notifications
+    await supabaseAdmin.from('project_members').delete().eq('user_id', id);
+    await supabaseAdmin.from('notifications').delete().eq('user_id', id);
+
+    // 4. Delete profile
+    const { error: deleteProfileErr } = await supabaseAdmin
+      .from('profiles')
+      .delete()
+      .eq('id', id);
+
+    if (deleteProfileErr) {
+      return res.status(400).json({ success: false, error: deleteProfileErr.message });
+    }
+
+    // 5. Delete Supabase Auth user so they can no longer log in
+    try {
+      await supabaseAdmin.auth.admin.deleteUser(id);
+    } catch (authDeleteErr: any) {
+      console.warn('Auth user delete note:', authDeleteErr.message);
+    }
+
+    return res.json({
+      success: true,
+      message: `Employee "${profile.name}" deleted successfully.`,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // POST /api/auth/login - Direct email/password authentication against database
 employeeRouter.post('/auth/login', async (req: Request, res: Response) => {
   try {
@@ -149,6 +252,7 @@ employeeRouter.post('/auth/login', async (req: Request, res: Response) => {
       data: {
         profile,
         token: authData.session.access_token,
+        refresh_token: authData.session.refresh_token,
       },
     });
   } catch (err: any) {

@@ -10,11 +10,14 @@ import {
   AlertCircle,
   X,
   Edit2,
+  Trash2,
 } from 'lucide-react';
 import { EmployeeService } from '../../services/employee.service';
+import { useAuth } from '../../context/AuthContext';
 import { UserProfile, Role } from '@antigravity/shared';
 
 export const EmployeesPage: React.FC = () => {
+  const { user: currentUser } = useAuth();
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -113,6 +116,28 @@ export const EmployeesPage: React.FC = () => {
       await fetchEmployees();
     } catch (err: any) {
       alert(`Failed to update status: ${err.message}`);
+    }
+  };
+
+  const handleDeleteEmployee = async (emp: any) => {
+    if (currentUser?.id === emp.id) {
+      alert('You cannot delete your own manager account.');
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Are you sure you want to permanently delete ${emp.name}'s account?\n\nThis will remove their profile and login credentials.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await EmployeeService.deleteEmployee(emp.id);
+      await fetchEmployees();
+    } catch (err: any) {
+      alert(`Failed to delete employee: ${err.message}`);
     }
   };
 
@@ -277,13 +302,22 @@ export const EmployeesPage: React.FC = () => {
                       title={isActive ? 'Deactivate Account' : 'Activate Account'}
                       className={`p-1.5 rounded-md transition-colors ${
                         isActive
-                          ? 'text-slate-400 hover:text-rose-600 hover:bg-slate-100'
+                          ? 'text-slate-400 hover:text-amber-600 hover:bg-slate-100'
                           : 'text-slate-400 hover:text-emerald-600 hover:bg-slate-100'
                       }`}
                     >
                       {isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
                     </button>
+                    <button
+                      onClick={() => handleDeleteEmployee(emp)}
+                      title={currentUser?.id === emp.id ? 'Cannot delete own account' : 'Delete Employee'}
+                      disabled={currentUser?.id === emp.id}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
+
                 </div>
               </div>
             );

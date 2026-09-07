@@ -225,6 +225,54 @@ projectRouter.delete('/projects/:id/members/:userId', async (req: Request, res: 
   }
 });
 
+// DELETE /api/projects/:id - Delete project and all associated stages, tasks, and files
+projectRouter.delete('/projects/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Fetch project to confirm existence
+    const { data: project, error: fetchErr } = await supabaseAdmin
+      .from('projects')
+      .select('id, name')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (fetchErr || !project) {
+      return res.status(404).json({ success: false, error: 'Project not found' });
+    }
+
+    // 2. Delete storage files for this project if any
+    try {
+      const { data: files } = await supabaseAdmin.storage
+        .from('project-attachments')
+        .list(id);
+      if (files && files.length > 0) {
+        const paths = files.map((f) => `${id}/${f.name}`);
+        await supabaseAdmin.storage.from('project-attachments').remove(paths);
+      }
+    } catch (storageErr) {
+      console.warn('Project storage cleanup note:', storageErr);
+    }
+
+    // 3. Delete from public.projects (foreign keys CASCADE to stages, tasks, updates, attachments, members)
+    const { error: deleteErr } = await supabaseAdmin
+      .from('projects')
+      .delete()
+      .eq('id', id);
+
+    if (deleteErr) {
+      return res.status(400).json({ success: false, error: deleteErr.message });
+    }
+
+    return res.json({
+      success: true,
+      message: `Project "${project.name}" deleted successfully.`,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // GET /api/dashboard/manager - Aggregate live metrics for Manager Dashboard
 projectRouter.get('/dashboard/manager', async (req: Request, res: Response) => {
   try {

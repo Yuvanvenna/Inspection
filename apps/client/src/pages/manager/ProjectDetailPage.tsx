@@ -158,17 +158,59 @@ export const ProjectDetailPage: React.FC = () => {
     }
   };
 
+  const handleDeleteTask = async (taskId: string, stageId: string, taskTitle: string) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete task "${taskTitle}"?\n\nStage progress and project overall progress will automatically recalculate.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await TaskService.deleteTask(taskId, stageId);
+      if (id) await loadProject(id);
+    } catch (err: any) {
+      alert(`Failed to delete task: ${err.message}`);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (!project || !id) return;
+    if (
+      !window.confirm(
+        `Are you sure you want to permanently delete project "${project.name}"?\n\nThis will remove all workflow stages, tasks, work updates, and project files. This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await ProjectService.deleteProject(id);
+      navigate('/manager/projects');
+    } catch (err: any) {
+      alert(`Failed to delete project: ${err.message}`);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Existing content continues... */}
       {/* Top Breadcrumb & Actions */}
       <div className="flex items-center justify-between">
         <button
           onClick={() => navigate('/manager/projects')}
-          className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors"
+          className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Projects Directory</span>
+        </button>
+
+        <button
+          onClick={handleDeleteProject}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          <span>Delete Project</span>
         </button>
       </div>
 
@@ -377,19 +419,28 @@ export const ProjectDetailPage: React.FC = () => {
                           Assigned to: {task.assigned_to_profile?.name || 'Unassigned'}
                         </p>
                       </div>
-                      <div className="text-right flex-shrink-0">
-                        <span className="text-xs font-black text-indigo-600">{task.progress}%</span>
-                        <span
-                          className={`block text-[10px] font-bold uppercase tracking-wider mt-0.5 ${
-                            task.status === 'BLOCKED'
-                              ? 'text-rose-600'
-                              : task.status === 'COMPLETED'
-                              ? 'text-emerald-600'
-                              : 'text-indigo-600'
-                          }`}
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <div className="text-right">
+                          <span className="text-xs font-black text-indigo-600">{task.progress}%</span>
+                          <span
+                            className={`block text-[10px] font-bold uppercase tracking-wider mt-0.5 ${
+                              task.status === 'BLOCKED'
+                                ? 'text-rose-600'
+                                : task.status === 'COMPLETED'
+                                ? 'text-emerald-600'
+                                : 'text-indigo-600'
+                            }`}
+                          >
+                            {task.status}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteTask(task.id, stage.id, task.title)}
+                          title="Delete Task"
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
                         >
-                          {task.status}
-                        </span>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
                   ))}

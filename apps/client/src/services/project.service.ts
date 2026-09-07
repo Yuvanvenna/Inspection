@@ -270,4 +270,26 @@ export const ProjectService = {
       throw new Error(error.message);
     }
   },
+
+  async deleteProject(id: string): Promise<void> {
+    try {
+      const res = await fetch(`${API_URL}/projects/${id}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) return;
+      const errJson = await res.json().catch(() => null);
+      if (errJson?.error) {
+        throw new Error(errJson.error);
+      }
+    } catch (e: any) {
+      if (e.message && !e.message.includes('fetch')) throw e;
+      console.warn('API deleteProject failed, falling back to direct Supabase:', e);
+    }
+
+    const { error } = await supabase.from('projects').delete().eq('id', id);
+    if (error) {
+      throw new Error(error.message);
+    }
+  },
 };
+

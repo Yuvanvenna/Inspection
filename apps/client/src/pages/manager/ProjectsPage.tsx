@@ -9,6 +9,7 @@ import {
   Search,
   X,
   AlertCircle,
+  Trash2,
 } from 'lucide-react';
 import { ProjectService, CreateProjectInput } from '../../services/project.service';
 import { ClientService } from '../../services/client.service';
@@ -124,6 +125,24 @@ export const ProjectsPage: React.FC = () => {
         return { ...prev, member_ids: [...members, empId] };
       }
     });
+  };
+
+  const handleDeleteProject = async (e: React.MouseEvent, project: Project) => {
+    e.stopPropagation();
+    if (
+      !window.confirm(
+        `Are you sure you want to permanently delete project "${project.name}"?\n\nThis will remove all workflow stages, tasks, work updates, and project files. This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await ProjectService.deleteProject(project.id);
+      await loadData();
+    } catch (err: any) {
+      alert(`Failed to delete project: ${err.message}`);
+    }
   };
 
   const filteredProjects = projects.filter((p) => {
@@ -298,14 +317,24 @@ export const ProjectsPage: React.FC = () => {
                   <span>Due {new Date(project.deadline).toLocaleDateString()}</span>
                 </div>
 
-                <button
-                  onClick={() => navigate(`/manager/projects/${project.id}`)}
-                  className="flex items-center gap-1.5 font-bold text-indigo-600 hover:text-indigo-700 transition-colors"
-                >
-                  <span>View Project Details</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={(e) => handleDeleteProject(e, project)}
+                    title="Delete Project"
+                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => navigate(`/manager/projects/${project.id}`)}
+                    className="flex items-center gap-1.5 font-bold text-indigo-600 hover:text-indigo-700 transition-colors"
+                  >
+                    <span>View Project Details</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
+
             </div>
           ))}
         </div>
