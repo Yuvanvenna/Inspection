@@ -6,7 +6,7 @@ import { isSoundEnabled, setSoundEnabled, playNotificationSound } from '../../ut
 import { supabase } from '../../lib/supabase';
 
 export const ProfilePage: React.FC = () => {
-  const { user, refreshUser } = useAuth();
+  const { user } = useAuth();
   const { showToast } = useToast();
   const [saving, setSaving] = useState(false);
 
@@ -60,10 +60,6 @@ export const ProfilePage: React.FC = () => {
           .from('profiles')
           .update({ department })
           .eq('id', user.id);
-
-        if (refreshUser) {
-          await refreshUser();
-        }
       }
 
       showToast('Profile preferences saved successfully!', 'success');
